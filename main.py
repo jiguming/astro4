@@ -15,7 +15,7 @@ st.write("""
 # 입력 슬라이더
 st.header("입력 매개변수")
 star_radius = st.slider("항성 반지름 (태양 반지름 단위, R☉)", 
-                        min_value=0.1, max_value=2REGION, value=1.0, step=0.1)
+                        min_value=0.1, max_value=2.0, value=1.0, step=0.1)
 planet_radius = st.slider("행성 반지름 (목성 반지름 단위, R_J)", 
                           min_value=0.1, max_value=2.0, value=1.0, step=0.1)
 
