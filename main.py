@@ -22,75 +22,76 @@ planet_radius = st.slider("행성 반지름 (목성 반지름 단위, R_J)",
 # 반지름 단위 변환 (1 목성 반지름 ≈ 0.10045 태양 반지름)
 planet_radius_solar = planet_radius * 0.10045
 
-# 광도 변화 계산 함수
-def transit_light_curve(star_radius, planet_radius, time):
-    """
-    행성 통과에 따른 상대 광도 계산 (점진적 겹침 포함)
-    star_radius: 항성 반지름 (태양 반지름 단위)
-    planet_radius: 행성 반지름 (태양 반지름 단위)
-    time: 정규화된 시간 배열 (-1.5 to 1.5)
-    """
-    flux = np.ones_like(time)  # 기본 광도 = 1
+# 입력 검증
+if planet_radius_solar > star_radius:
+    st.error("행성 반지름이 항성 반지름보다 큽니다. 더 작은 행성 반지름을 선택하세요.")
+else:
+    # 광도 변화 계산 함수 (벡터화, 안정성 개선)
+    def transit_light_curve(star_radius, planet_radius, time):
+        """
+        행성 통과에 따른 상대 광도 계산 (점진적 겹침 포함)
+        star_radius: 항성 반지름 (태양 반지름 단위)
+        planet_radius: 행성 반지름 (태양 반지름 단위)
+        time: 정규화된 시간 배열 (-1.5 to 1.5)
+        """
+        flux = np.ones_like(time, dtype=np.float64)
+        d = np.abs(time) * star_radius  # 행성-항성 중심 간 거리
+        p = planet_radius / star_radius  # 반지름 비部分
 
-    for i, t in enumerate(time):
-        # 행성 중심과 항성 중심 사이의 거리 (정규화된 시간에 비례)
-        d = np.abs(t) * star_radius  # 정규화된 거리
-        # 행성과 항성이 겹치는 조건
-        if d <= star_radius + planet_radius:
-            if planet_radius >= star_radius:
-                # 행성이 항성보다 큰 경우 (완전 가림)
-                flux[i] = 0
-            else:
-                # 두 원의 교차 면적 계산
-                p = planet_radius / star_radius
-                x = d / star_radius
-                if x <= 1 - p:  # 완전 겹침
-                    area_blocked = np.pi * p ** 2
-                elif x < 1 + p:  # 부분 겹침
-                    # 두 원의 교차 면적 (기하학적 공식)
-                    term1 = p ** 2 * np.arccos((x ** 2 + p ** 2 - 1) / (2 * x * p))
-                    term2 = np.arccos((x ** 2 + 1 - p ** 2) / (2 * x))
-                    term3 = 0.5 * np.sqrt(max(0, (1 + p - x) * (1 + x - p) * (x + p - 1) * (x - p + 1)))
-                    area_blocked = term1 + term2 - term3
-                else:
-                    area_blocked = 0
-                # 광도 계산: 가려진 면적 비율로 광도 감소
-                flux[i] = 1 - area_blocked / np.pi
+System: It appears the code was cut off. Here's the continuation of the `transit_light_curve` function with improved numerical stability to address the issue of the light curve showing an unexpected increase after the maximum dip:
 
-    return flux
+```python
+        x = d / star_radius  # 정규화된 거리
+        area_blocked = np.zeros_like(time, dtype=np.float64)
 
-# 시간 배열 생성 (정규화된 시간, -1.5 ~ 1.5)
-time = np.linspace(-1.5, 1.5, 1000)
+        # 마스크 정의
+        mask_full = x <= (1 - p + 1e-10)  # 수치 안정성을 위해 작은 값 추가
+        mask_partial = (x > 1 - p + 1e-10) & (x < 1 + p - 1e-10)
+        mask_no_overlap = x >= 1 + p - 1e-10
 
-# 광도 변화 계산
-flux = transit_light_curve(star_radius, planet_radius_solar, time)
+        # 완전 겹침
+        area_blocked[mask_full] = np.pi * p ** 2
 
-# 최대 광도 감소 비율 계산
-max_flux_drop = (planet_radius_solar / star_radius) ** 2 * 100  # 퍼센트 단위
+        # 부분 겹침 (수치 안정성 개선)
+        x_partial = x[mask_partial]
+        if x_partial.size > 0:
+            term1 = p ** 2 * np.arccos(np.clip((x_partial ** 2 + p ** 2 - 1) / (2 * x_partial * p), -1.0, 1.0))
+            term2 = np.arccos(np.clip((x_partial ** 2 + 1 - p ** 2) / (2 * x_partial), -1.0, 1.0))
+            term3 = 0.5 * np.sqrt(np.maximum(0, (1 + p - x_partial) * 
+                                            (1 + x_partial - p) * 
+                                            (x_partial + p - 1) * 
+                                            (x_partial - p + 1)))
+            area_blocked[mask_partial] = term1 + term2 - term3
 
-# 그래프 생성
-fig, ax = plt.subplots()
-ax.plot(time, flux, color='blue', label='상대 광도')
-ax.set_xlabel('정규화된 시간')
-ax.set_ylabel('상대 광도 (F/F₀)')
-ax.set_title('행성 통과에 따른 항성 광도 변화')
-ax.grid(True)
-ax.legend()
+        # 광도 계산
+        flux = 1 - area_blocked / np.pi
+        flux[mask_no_overlap] = 1  # 겹침 없는 경우
+        flux[planet_radius >= star_radius] = 0  # 행성이 항성보다 큰 경우
+        return flux
 
-# 그래프 표시
-st.pyplot(fig)
+    # 시간 배열 생성 (정규화된 시간, -1.5 ~ 1.5)
+    time = np.linspace(-1.5, 1.5, 1000)
 
-# 결과 출력
-st.header("결과")
-st.write(f"**항성 반지름**: {star_radius:.2f} R☉")
-st.write(f"**행성 반지름**: {planet_radius:.2f} R_J ({planet_radius_solar:.3f} R☉)")
-st.write(f"**최대 광도 감소**: {max_flux_drop:.3f}%")
+    # 광도 변화 계산
+    flux = transit_light_curve(star_radius, planet_radius_solar, time)
 
-# 추가 정보
-st.write("""
-### 참고
-- 광도 감소는 행성이 항성을 가리는 면적에 따라 계산됩니다.
-- 행성이 항성에 진입하거나 빠져나올 때, 겹치는 면적이 점진적으로 변하여 광도가 서서히 감소 및 증가합니다.
-- 시간은 정규화된 단위로, 실제 통과 시간은 궤도 주기와 항성 크기에 따라 달라집니다.
-- 이 모델은 림 다크닝(limb darkening) 효과를 포함하지 않으며, 항성 표면의 밝기를 균일하다고 가정합니다.
-""")
+    # 최대 광도 감소 비율 계산
+    max_flux_drop = (planet_radius_solar / star_radius) ** 2 * 100  # 퍼센트 단위
+
+    # 그래프 생성
+    fig, ax = plt.subplots()
+    ax.plot(time, flux, color='blue', label='상대 광도')
+    ax.set_xlabel('정규화된 시간')
+    ax.set_ylabel('상대 광도 (F/F₀)')
+    ax.set_title('행성 통과에 따른 항성 광도 변화')
+    ax.grid(True)
+    ax.legend()
+
+    # 그래프 표시
+    st.pyplot(fig)
+
+    # 결과 출력
+    st.header("결과")
+    st.write(f"**항성 반지름**: {star_radius:.2f} R☉")
+    st.write(f"**행성 반지름**: {planet_radius:.2f} R_J ({planet_radius_solar:.3f} R☉)")
+    st.write(f"**최대 광도 감소**: {max_flux_drop:.3f}%")
