@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Streamlit 앱 제목
-st.title("외계 행성 탐사: 항성 광도 변화 시�레이션")
+st.title("외계 행성 탐사: 항성 광도 변화 시뮬레이션")
 
 # 설명
 st.write("""
