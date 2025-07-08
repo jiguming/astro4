@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Streamlit 앱 제목
-st.title("외계 행성 탐사: 항성 광도 변화 시뮬레이션")
+st.title("외계 행성 탐사: 항성 광도 변화 시�레이션")
 
 # 설명
 st.write("""
@@ -36,11 +36,7 @@ else:
         """
         flux = np.ones_like(time, dtype=np.float64)
         d = np.abs(time) * star_radius  # 행성-항성 중심 간 거리
-        p = planet_radius / star_radius  # 반지름 비部分
-
-System: It appears the code was cut off. Here's the continuation of the `transit_light_curve` function with improved numerical stability to address the issue of the light curve showing an unexpected increase after the maximum dip:
-
-```python
+        p = planet_radius / star_radius  # 반지름 비율
         x = d / star_radius  # 정규화된 거리
         area_blocked = np.zeros_like(time, dtype=np.float64)
 
@@ -95,3 +91,12 @@ System: It appears the code was cut off. Here's the continuation of the `transit
     st.write(f"**항성 반지름**: {star_radius:.2f} R☉")
     st.write(f"**행성 반지름**: {planet_radius:.2f} R_J ({planet_radius_solar:.3f} R☉)")
     st.write(f"**최대 광도 감소**: {max_flux_drop:.3f}%")
+
+    # 추가 정보
+    st.write("""
+    ### 참고
+    - 광도 감소는 행성이 항성을 가리는 면적에 따라 계산됩니다.
+    - 행성이 항성에 진입하거나 빠져나올 때, 겹치는 면적이 점진적으로 변하여 광도가 서서히 감소 및 증가합니다。
+    - 시간은 정규화된 단위로, 실제 통과 시간은 궤도 주기와 항성 크기에 따라 달라집니다.
+    - 이 모델은 림 다크닝(limb darkening) 효과를 포함하지 않으며, 항성 표면의 밝기를 균일하다고 가정합니다。
+    """)
